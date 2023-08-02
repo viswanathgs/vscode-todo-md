@@ -31,6 +31,17 @@ export function sortTasks({
 		sortProperty,
 	});
 
+	// Recursively sort nested tasks
+	for (const task of sortedTasks) {
+		if (task.subtasks.length) {
+			tasks = task.subtasks;
+			task.subtasks = doSortTasks({
+				tasks,
+				sortProperty,
+			});
+		}
+	}
+
 	return uniqueTasks(sortedTasks);
 }
 

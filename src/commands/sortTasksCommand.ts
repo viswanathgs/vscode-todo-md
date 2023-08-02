@@ -1,4 +1,4 @@
-import { TextEditor, TextEditorEdit } from 'vscode';
+import { TextEditor, TextEditorEdit, window } from 'vscode';
 import { TheTask } from '../TheTask';
 import { $state } from '../extension';
 import { SortProperty, sortTasks } from '../sort';
@@ -22,13 +22,26 @@ export function sortTasksInEditorCommand(editor: TextEditor, edit: TextEditorEdi
 		lineStart = $state.documentStartLine;
 	}
 
+	// Fetch only the top-level tasks within the selection to avoid messing up
+	// nested tasks after sorting and to retain the tree structure.
 	const tasks: TheTask[] = [];
 	for (let i = lineStart; i <= lineEnd; i++) {
-		const task = getTaskAtLineExtension(i);
+		let task = getTaskAtLineExtension(i);
 		if (task) {
 			tasks.push(task);
+			// Jump past all subtasks of this task
+			while (task.subtasks.length) {
+				task = task.subtasks[task.subtasks.length - 1];
+				i = task.lineNumber;
+			}
+		}
+		// Raise an error if the selection doesn't fully cover all subtasks of a task
+		if (i > lineEnd) {
+			window.showErrorMessage('Cannot sort a partial selection');
+			return;
 		}
 	}
+
 	const sortedTasks = sortTasks({
 		tasks,
 		sortProperty,
@@ -36,6 +49,6 @@ export function sortTasksInEditorCommand(editor: TextEditor, edit: TextEditorEdi
 	if (!sortedTasks.length) {
 		return;
 	}
-	const result = sortedTasks.map(t => t.rawText).join('\n');
+	const result = sortedTasks.map(t => t.rawTextWithNestedTasks()).join('\n');
 	edit.replace(getFullRangeFromLines(editor.document, lineStart, lineEnd), result);
 }
